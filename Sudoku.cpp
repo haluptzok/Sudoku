@@ -1,5 +1,5 @@
 /******************************Module*Header*******************************\
-* Module Name: sudoku.cpp
+Module Name: sudoku.cpp
 
 This solves a Sudoku puzzle.
 
