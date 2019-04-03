@@ -1,10 +1,10 @@
 /******************************Module*Header*******************************\
-Module Name: sudoku.cpp
+* Module Name: sudoku.cpp
 
 This solves a Sudoku puzzle.
 
 It was built on Windows10 with VisualStudio 17 - but it could easily be 
-made to run on Linux.
+compiled to run on Linux - it's just a command line app.
 
 Enter a Sudoku board on the command line or read it in from a txt file like this:
 
@@ -23,7 +23,7 @@ knew about to remove possible numbers from other unconstrained cells
 and then if that doesn't solve it, the program just starts guessing by
 enumerating the possible values for the under constrained cells
 and sees if adding that constraint will solve the puzzle, and then recursing
-on guesses if the guess still doesn't yeild unique solution.
+on guesses if the guess still doesn't yeild a solution.
 
 It works on all the puzzles we got on the plane ride, but puzzles can
 be made more difficult such that more sopisticated constraints are needed
@@ -32,61 +32,54 @@ or this program will just run too long enumerating through possible solutions.
 https://www.inf.tu-dresden.de/content/institutes/ki/cl/study/winter06/fcp/fcp/sudoku.pdf
 extreme7 and extreme8 are examples from the web that claimed to be the 
 world's hardest puzzles, but in this pdf paper I see other constraints
-that I could add (like 5.1, 5.2, 5.3), and ensuring if a cell is the only one that
-contains a possible number in a row, column or block, then that cell has to be that number.
-And my guessing enumeration should probably start with the most 
+that I could add (like 5.1, 5.2, 5.3)
+And my enumeration of guesses should probably start with the most 
 constrained cells first (those with smallest number of possibilities left) to
 dead end more quickly.
 
-Note most puzzles are solved by just propagating constraints to a unique solution, extreme6
-is one that actually has to do some guessing to find the answer.
-
-Thoutput below shows the initial board with possible
+The output below shows extreme8.txt, with the initial board with possible
 numbers allowed in each cell, then the numbers possible in each cell after propagating
-my constraints and then the final answer, made by guessing recursively till one
+the constraints and then the final answer, made by guessing recursively till one
 works.
 
-C:\Sudoku\Release>Sudoku < extreme6.txt
-Sudoku
-123456789|123456789|123456789|      7  |   4     |123456789|        9|123456789| 2       |
-123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|    5    |
- 2       |123456789|123456789|123456789|123456789|  3      |123456789|      7  |123456789|
-123456789|   4     |123456789|       8 |123456789|123456789|      7  |123456789|123456789|
-    5    |123456789|      7  |123456789|123456789|123456789|  3      |123456789|        9|
-123456789|123456789| 2       |123456789|123456789|        9|123456789|       8 |123456789|
-123456789|        9|123456789| 2       |123456789|123456789|123456789|123456789|1        |
-   4     |123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|
-  3      |123456789|    5    |123456789|1        |       8 |123456789|123456789|123456789|
+C:\Sudoku\x64\Release>Sudoku.exe < extreme8.txt
+Sudoku.exe
+       8 |123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|
+123456789|123456789|  3      |     6   |123456789|123456789|123456789|123456789|123456789|
+123456789|      7  |123456789|123456789|        9|123456789| 2       |123456789|123456789|
+123456789|    5    |123456789|123456789|123456789|      7  |123456789|123456789|123456789|
+123456789|123456789|123456789|123456789|   4     |    5    |      7  |123456789|123456789|
+123456789|123456789|123456789|1        |123456789|123456789|123456789|  3      |123456789|
+123456789|123456789|1        |123456789|123456789|123456789|123456789|     6   |       8 |
+123456789|123456789|       8 |    5    |123456789|123456789|123456789|1        |123456789|
+123456789|        9|123456789|123456789|123456789|123456789|   4     |123456789|123456789|
 
-1    6 8 |1 3 56 8 |1 3  6 8 |      7  |   4     |1   56   |        9|1 3  6   | 2       |
-1    6789|1 3  678 |1 34 6 89|1    6  9| 2   6 89|12   6   |1  4 6   |1 34 6   |    5    |
- 2       |1   56   |1  4 6  9|1   56  9|    56  9|  3      |1  4 6   |      7  |       8 |
-1       9|   4     |1 3     9|       8 | 23 5    |12  5    |      7  |12  5    |     6   |
-    5    |1    6 8 |      7  |1  4 6   | 2   6   |12 4 6   |  3      |12       |        9|
-1    6   |1 3  6   | 2       |1 3 56   |  3 567  |        9|1   5    |       8 |   4     |
-     678 |        9|     6 8 | 2       |  3 567  |   4567  |   456 8 |   456   |1        |
-   4     |12   678 |1    6 8 |    56  9|    567 9|    567  | 2  56 8 | 2  56  9|  3      |
-  3      | 2   6   |    5    |   4 6  9|1        |       8 | 2 4 6   | 2 4 6  9|      7  |
+       8 |12 4 6   | 2 456  9| 234  7  |123 5 7  |1234     |1 3 56  9|   45 7 9|1 34567 9|
+12 45   9|12 4     |  3      |     6   |12  5 78 |12 4   8 |1   5  89|   45 789|1  45 7 9|
+1  456   |      7  |   456   |  34   8 |        9|1 34   8 | 2       |   45  8 |1 3456   |
+1234 6  9|    5    | 2 4 6  9| 23    89| 23  6 8 |      7  |1    6 89| 2 4   89|12 4 6  9|
+123  6  9|123  6 8 | 2   6  9| 23    89|   4     |    5    |      7  | 2     89|12   6  9|
+ 2 4 67 9| 2 4 6 8 | 2 4 67 9|1        | 2   6 8 | 2   6 89|    56 89|  3      | 2 456  9|
+ 2345 7  | 234     |1        | 234  7 9| 23   7  | 234    9|  3 5   9|     6   |       8 |
+ 234 67  | 234 6   |       8 |    5    | 23  67  | 234 6  9|  3     9|1        | 23   7 9|
+ 23 567  |        9| 2  567  | 23   78 |123  678 |123  6 8 |   4     | 2  5 7  | 23 5 7  |
 
-       8 |  3      |1        |      7  |   4     |    5    |        9|     6   | 2       |
-     6   |      7  |        9|1        |       8 | 2       |   4     |  3      |    5    |
- 2       |    5    |   4     |     6   |        9|  3      |1        |      7  |       8 |
-        9|   4     |  3      |       8 |    5    |1        |      7  | 2       |     6   |
-    5    |       8 |      7  |   4     | 2       |     6   |  3      |1        |        9|
-1        |     6   | 2       |  3      |      7  |        9|    5    |       8 |   4     |
-      7  |        9|     6   | 2       |  3      |   4     |       8 |    5    |1        |
-   4     |1        |       8 |    5    |     6   |      7  | 2       |        9|  3      |
-  3      | 2       |    5    |        9|1        |       8 |     6   |   4     |      7  |
+       8 |1        | 2       |      7  |    5    |  3      |     6   |   4     |        9|
+        9|   4     |  3      |     6   |       8 | 2       |1        |      7  |    5    |
+     6   |      7  |    5    |   4     |        9|1        | 2       |       8 |  3      |
+1        |    5    |   4     | 2       |  3      |      7  |       8 |        9|     6   |
+  3      |     6   |        9|       8 |   4     |    5    |      7  | 2       |1        |
+ 2       |       8 |      7  |1        |     6   |        9|    5    |  3      |   4     |
+    5    | 2       |1        |        9|      7  |   4     |  3      |     6   |       8 |
+   4     |  3      |       8 |    5    | 2       |     6   |        9|1        |      7  |
+      7  |        9|     6   |  3      |1        |       8 |   4     |    5    | 2       |
 
-
-Total time taken: 47
-Guesss made 5
+Total Guesses made: 41796
+Wall clock time passed: 391.24 ms
 
 * Created: 01-Apr-2019 15:48:25
 * Author: Patrick Haluptzok
 \**************************************************************************/
-// Sudoku.cpp : Defines the entry point for the console application.
-//
 
 #include "stdafx.h"
 
