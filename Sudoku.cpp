@@ -104,9 +104,9 @@ using namespace std;
 #define P9 0x0100
 #define PALL 0x01FF
 
-#define TICK_DIFF(start,end) ((DWORD) ((end >= start) ? (end - start) : (0xffffffff - start + end)))
+std::chrono::high_resolution_clock::time_point t_last; // Used to time execution
 
-int gcGuess;		   // How many guesses we made to find the answer
+__int64 gcGuess;		   // How many guesses we made to find the answer
 
 class Board
 {
@@ -190,6 +190,35 @@ inline bool TripleBit(unsigned short x)
 	return ((z & (z - 1)) == 0); // 3 bits OK
 }
 
+inline int BitSet(unsigned short x)
+{
+	assert(x);
+	assert(SingleBit(x));
+	switch (x)
+	{
+	case P1:
+		return 1;
+	case P2:
+		return 2;
+	case P3:
+		return 3;
+	case P4:
+		return 4;
+	case P5:
+		return 5;
+	case P6:
+		return 6;
+	case P7:
+		return 7;
+	case P8:
+		return 8;
+	case P9:
+		return 9;
+	}
+	assert(true);  // What?
+	return 0;
+}
+
 // Apply constraints to other positions
 
 bool Board::bConstrain(void)
@@ -199,6 +228,149 @@ bool Board::bConstrain(void)
 	do
 	{
 		bUpdated = false;
+
+		// Look for a number that occurs only 1 time in a row, column, 3x3 grid.
+		// If the number has other numbers possible in that cell, make it just that number.
+		// 9 (rows/columns/grids) X 10 possible values (well the zero value doesn't really happen).
+		// Count how many times each number appears when it isn't already a singleton in a cell.
+		// We don't need to fix singletons - so increment more so we don't see the cell as interesting to process later.
+		int cRow[9][10];
+		int cCol[9][10];
+		int cGrd[3][3][10];
+		memset(&cRow, 0, sizeof(cRow));
+		memset(&cCol, 0, sizeof(cCol));
+		memset(&cGrd, 0, sizeof(cGrd));
+
+		for (auto i = 0; i < 9; i++)
+		{
+			for (auto j = 0; j < 9; j++)
+			{
+				const int iGridRow = i / 3;
+				const int iGridCol = j / 3;
+
+				short sCell = Cell[i][j];
+
+				if (SingleBit(sCell))   // Just 1 number is set, increment by 2 so we don't post-process this cell
+				{
+					int iValue = BitSet(sCell);
+					cRow[i][iValue] += (sCell << 1);
+					cCol[j][iValue] += (sCell << 1);
+					cGrd[iGridRow][iGridCol][iValue] += (sCell << 1);
+				}
+				else
+				{
+					// Incrementing at bit offset == 1 for each iNum, we undo that below when checking counts
+					cRow[i][1] += sCell & P1;
+					cRow[i][2] += sCell & P2;
+					cRow[i][3] += sCell & P3;
+					cRow[i][4] += sCell & P4;
+					cRow[i][5] += sCell & P5;
+					cRow[i][6] += sCell & P6;
+					cRow[i][7] += sCell & P7;
+					cRow[i][8] += sCell & P8;
+					cRow[i][9] += sCell & P9;
+
+					cCol[j][1] += sCell & P1;
+					cCol[j][2] += sCell & P2;
+					cCol[j][3] += sCell & P3;
+					cCol[j][4] += sCell & P4;
+					cCol[j][5] += sCell & P5;
+					cCol[j][6] += sCell & P6;
+					cCol[j][7] += sCell & P7;
+					cCol[j][8] += sCell & P8;
+					cCol[j][9] += sCell & P9;
+
+					cGrd[iGridRow][iGridCol][1] += sCell & P1;
+					cGrd[iGridRow][iGridCol][2] += sCell & P2;
+					cGrd[iGridRow][iGridCol][3] += sCell & P3;
+					cGrd[iGridRow][iGridCol][4] += sCell & P4;
+					cGrd[iGridRow][iGridCol][5] += sCell & P5;
+					cGrd[iGridRow][iGridCol][6] += sCell & P6;
+					cGrd[iGridRow][iGridCol][7] += sCell & P7;
+					cGrd[iGridRow][iGridCol][8] += sCell & P8;
+					cGrd[iGridRow][iGridCol][9] += sCell & P9;
+				}
+			}
+		}
+
+		// Now check if any numbers in any cells occurred only once (in a row,col,Grd), and also were not singletons already
+		for (auto i = 0; i < 9; i++)
+		{
+			for (auto iNum = 1; iNum <= 9; iNum++)
+			{
+				int cCount = cRow[i][iNum] >> (iNum - 1);  // We added the bits above - shift over.
+				assert(cCount < 11);
+				if (cCount <= 0)
+				{
+					// cout << "Every number must appear possible in every row " << cCount << "\n";
+					return(false);
+				}
+				else if (cCount == 1)
+				{
+					// Only cell this number is listed as possible in - so must be this number
+
+					short sNewValue = 0x0001 << (iNum - 1);
+
+					for (auto iCol = 0; iCol < 9; iCol++)
+					{
+						if (Cell[i][iCol] & sNewValue)
+						{
+							Cell[i][iCol] = sNewValue;
+							// cout << "Only possible number in row1\n";
+							break;  // Only happens once
+						}
+					}
+				}
+
+				cCount = cCol[i][iNum] >> (iNum - 1);  // We added the bits above - shift over.
+				assert(cCount < 11);
+				if (cCount <= 0)
+				{
+					// cout << "Every number must appear possible in every col " << cCount << "\n";
+					return(false);
+				}
+				else if (cCount == 1)
+				{
+					// Only cell this number is listed as possible in - so must be this number
+
+					short sNewValue = 0x0001 << (iNum - 1);
+
+					for (auto iRow = 0; iRow < 9; iRow++)
+					{
+						if (Cell[iRow][i] & sNewValue)
+						{
+							Cell[iRow][i] = sNewValue;
+							// cout << "Only possible number in col1\n";
+							break;  // Only happens once
+						}
+					}
+				}
+
+				cCount = cGrd[i/3][i%3][iNum] >> (iNum - 1);  // We added the bits above - shift over.
+				assert(cCount < 11);
+				if (cCount <= 0)
+				{
+					// cout << "Every number must appear possible in every grd " << cCount << "\n";
+					return(false);
+				}
+				else if (cCount == 1)
+				{
+					// Only cell this number is listed as possible in - so must be this number
+
+					short sNewValue = 0x0001 << (iNum - 1);
+
+					for (auto iGrd = 0; iGrd < 9; iGrd++)
+					{
+						if (Cell[3 * (i/3) + (iGrd/3)][3 * (i%3) + (iGrd%3)] & sNewValue)
+						{
+							Cell[3 * (i/3) + (iGrd/3)][3 * (i%3) + (iGrd%3)] = sNewValue;
+							// cout << "Only possible number in grd\n";
+							break;  // Only happens once
+						}
+					}
+				}
+			}
+		}
 
 		for (auto i = 0; i < 9; i++)
 		{
@@ -695,7 +867,11 @@ bool Board::bSolveIt(bool bDisplay)
 							gameNew.Cell[i][j] = mask; // Add Constraint, we guessed it.
 							gcGuess += 1;
 							if (gcGuess % 1000000 == 0)
-								cout << "Guess made " << gcGuess << "\n";
+							{
+								std::chrono::high_resolution_clock::time_point t_now = std::chrono::high_resolution_clock::now();
+								cout << "Guesses made: " << gcGuess << " time since last " << std::chrono::duration<double, std::milli>(t_now - t_last).count() << " ms\n";
+								t_last = t_now;
+							}
 
 							if (gameNew.bSolveIt(false))  // If we succeed - we are done.   Don't return true to enumerate all solutions, pass bSolveIt true to print them all out
 							{
@@ -764,12 +940,13 @@ int main(int argc, char* argv[])
 
 	game.DisplayBoard();
 
-	DWORD dwStart = GetTickCount();
+	std::chrono::high_resolution_clock::time_point t_start = t_last = std::chrono::high_resolution_clock::now();
 	game.bSolveIt(true);
-	DWORD dwEnd = GetTickCount();    
-	DWORD cTicks = TICK_DIFF(dwStart, dwEnd);
+	std::chrono::high_resolution_clock::time_point t_end = std::chrono::high_resolution_clock::now();
 
 	game.DisplayBoard();
-	cout << "\nTotal time taken: " << cTicks << "\n";
 	cout << "Total Guesses made: " << gcGuess << "\n";
+	std::cout << std::fixed << std::setprecision(2) << "Wall clock time passed: "
+		<< std::chrono::duration<double, std::milli>(t_end - t_start).count()
+		<< " ms\n";
 }

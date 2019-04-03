@@ -6,13 +6,13 @@
 #pragma once
 
 #include "targetver.h"
-
+#include <iostream>
+#include <iomanip>
+#include <chrono>
+#include <ctime>
+#include <thread>
 #include <stdio.h>
 #include <tchar.h>
-#include <iostream>
-#include <Windows.h>
 #include <assert.h>
-
-
 
 // TODO: reference additional headers your program requires here
