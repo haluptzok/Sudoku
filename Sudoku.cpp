@@ -29,10 +29,10 @@ It works on all the puzzles we got on the plane ride, but puzzles can
 be made more difficult such that more sopisticated constraints are needed
 or this program will just run too long enumerating through possible solutions.
 
+http://www.angusj.com/sudoku/hints.php
 https://www.inf.tu-dresden.de/content/institutes/ki/cl/study/winter06/fcp/fcp/sudoku.pdf
-extreme7 and extreme8 are examples from the web that claimed to be the 
-world's hardest puzzles, but in this pdf paper I see other constraints
-that I could add (like 5.1, 5.2, 5.3)
+I see other constraints that I could add in the attached links.
+Hidden Pairs, Hidden Triples, Hidden Quads, and Naked Triples and Naked Quads would be good.
 And my enumeration of guesses should probably start with the most 
 constrained cells first (those with smallest number of possibilities left) to
 dead end more quickly.
@@ -112,7 +112,7 @@ public:
 	}
 
 	void DisplayBoard(void);
-	bool bConstrain(void);
+	bool bConstrain(bool bFirst);
 	bool bDone(void);
 	bool bSolveIt(bool);
 };
@@ -213,8 +213,8 @@ inline int BitSet(unsigned short x)
 }
 
 // Apply constraints to other positions
-
-bool Board::bConstrain(void)
+// bFirst means we haven't guessed yet, so no invalid board constraints should happen, like they will when we guess
+bool Board::bConstrain(bool bFirst)  
 {
 	bool bUpdated;
 
@@ -295,7 +295,8 @@ bool Board::bConstrain(void)
 				assert(cCount < 11);
 				if (cCount <= 0)
 				{
-					// cout << "Every number must appear possible in every row " << cCount << "\n";
+					if (bFirst) 
+						cout << "Every number must appear possible in every row " << cCount << "\n";
 					return(false);
 				}
 				else if (cCount == 1)
@@ -310,6 +311,7 @@ bool Board::bConstrain(void)
 						{
 							Cell[i][iCol] = sNewValue;
 							// cout << "Only possible number in row1\n";
+							bUpdated = true;
 							break;  // Only happens once
 						}
 					}
@@ -319,7 +321,8 @@ bool Board::bConstrain(void)
 				assert(cCount < 11);
 				if (cCount <= 0)
 				{
-					// cout << "Every number must appear possible in every col " << cCount << "\n";
+					if (bFirst)
+						cout << "Every number must appear possible in every col " << cCount << "\n";
 					return(false);
 				}
 				else if (cCount == 1)
@@ -334,6 +337,7 @@ bool Board::bConstrain(void)
 						{
 							Cell[iRow][i] = sNewValue;
 							// cout << "Only possible number in col1\n";
+							bUpdated = true;
 							break;  // Only happens once
 						}
 					}
@@ -343,7 +347,8 @@ bool Board::bConstrain(void)
 				assert(cCount < 11);
 				if (cCount <= 0)
 				{
-					// cout << "Every number must appear possible in every grd " << cCount << "\n";
+					if (bFirst) 
+						cout << "Every number must appear possible in every grd " << cCount << "\n";
 					return(false);
 				}
 				else if (cCount == 1)
@@ -358,12 +363,201 @@ bool Board::bConstrain(void)
 						{
 							Cell[3 * (i/3) + (iGrd/3)][3 * (i%3) + (iGrd%3)] = sNewValue;
 							// cout << "Only possible number in grd\n";
+							bUpdated = true;
 							break;  // Only happens once
 						}
 					}
 				}
 			}
 		}
+
+		// All 3X3 grids have 3 rows through them. Any numbers not possible in the part of a 3x3 grid that isn't intersecting
+		// the row, those numbers can't show up in the non-interescting part of the row - and vice versa.  Also
+		// same for columns.
+
+		for (auto iGridRow = 0; iGridRow < 3; iGridRow++)
+		{
+			for (auto iGridCol = 0; iGridCol < 3; iGridCol++)
+			{
+				// For each row that intersects a 3x3 grid, make sure the non-intersecting part of the
+				// row doesn't have numbers that aren't in the non-intersecting part of the 3x3 grid
+				// and vice versa.
+
+				for (auto iRow = 0; iRow < 3; iRow++)
+				{
+					// OR together all the cells in the Row outside the 3X3 grid box to see what numbers are possible
+
+					short cellRow = 0;
+
+					for (auto iCol = 0; iCol < 9; iCol++)
+					{
+						if ((iCol > (3 * iGridCol + 2)) || (iCol < (3 * iGridCol)))
+						{
+							cellRow |= Cell[iRow + iGridRow * 3][iCol];
+						}
+					}
+
+					// OR together all the cells in the 3X3 grid box outside the row to see what numbers are possible
+
+					short cellGrid = 0;
+
+					for (auto iCol = 0; iCol < 9; iCol++)
+					{
+						for (auto iY = 0; iY < 3; iY++)
+						{
+							for (auto iX = 0; iX < 3; iX++)
+							{
+								if (iY != iRow)
+								{
+									cellGrid |= Cell[iY + iGridRow * 3][iX + iGridCol * 3];
+								}
+							}
+						}
+					}
+
+					// Now AND out any numbers not possible on the other side of the row outside the 3X3 grid box
+
+					for (auto iCol = 0; iCol < 9; iCol++)
+					{
+						if ((iCol >(3 * iGridCol + 2)) || (iCol < (3 * iGridCol)))
+						{
+							short cellNew = Cell[iRow + iGridRow * 3][iCol] & cellGrid;
+
+							if (cellNew != Cell[iRow + iGridRow * 3][iCol])
+							{
+								Cell[iRow + iGridRow * 3][iCol] = cellNew;
+								bUpdated = true;
+							}
+
+							if (cellNew == 0)
+							{
+								if (bFirst) 
+									cout << "Shouldn't happen on valid start";
+								return false;
+							}
+						}
+					}
+
+					// Now AND out any numbers not possible on the other side of the 3X3 grid box outside the row
+
+					for (auto iCol = 0; iCol < 9; iCol++)
+					{
+						for (auto iY = 0; iY < 3; iY++)
+						{
+							for (auto iX = 0; iX < 3; iX++)
+							{
+								if (iY != iRow)
+								{
+									short cellNew = Cell[iY + iGridRow * 3][iX + iGridCol * 3] & cellRow;
+
+									if (cellNew != Cell[iY + iGridRow * 3][iX + iGridCol * 3])
+									{
+										Cell[iY + iGridRow * 3][iX + iGridCol * 3] = cellNew;
+										bUpdated = true;
+									}
+
+									if (cellNew == 0)
+									{
+										if (bFirst) 
+											cout << "Shouldn't happen on valid start";
+										return false;
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Do what we did for rows above for columns now
+
+				for (auto iCol = 0; iCol < 3; iCol++)
+				{
+					// OR together all the cells in the colum outside the 3X3 grid box to see what numbers are possible
+
+					short cellCol = 0;
+
+					for (auto iRow = 0; iRow < 9; iRow++)
+					{
+						if ((iRow >(3 * iGridRow + 2)) || (iRow < (3 * iGridRow)))
+						{
+							cellCol |= Cell[iRow][iCol + iGridCol * 3];
+						}
+					}
+
+					// OR together all the cells in the 3X3 grid box outside the column to see what numbers are possible
+
+					short cellGrid = 0;
+
+					for (auto iRow = 0; iRow < 9; iRow++)
+					{
+						for (auto iY = 0; iY < 3; iY++)
+						{
+							for (auto iX = 0; iX < 3; iX++)
+							{
+								if (iX != iCol)
+								{
+									cellGrid |= Cell[iY + iGridRow * 3][iX + iGridCol * 3];
+								}
+							}
+						}
+					}
+
+					// Now AND out any numbers not possible on the other side of the column outside the 3X3 grid box
+
+					for (auto iRow = 0; iRow < 9; iRow++)
+					{
+						if ((iRow >(3 * iGridRow + 2)) || (iRow < (3 * iGridRow)))
+						{
+							short cellNew = Cell[iRow][iCol + iGridCol * 3] & cellGrid;
+
+							if (cellNew != Cell[iRow][iCol + iGridCol * 3])
+							{
+								Cell[iRow][iCol + iGridCol * 3] = cellNew;
+								bUpdated = true;
+							}
+
+							if (cellNew == 0)
+							{
+								if (bFirst) 
+									cout << "Shouldn't happen on valid start";
+								return false;
+							}
+						}
+					}
+
+					// Now AND out any numbers not possible on the other side of the 3X3 grid box outside the column
+
+					for (auto iRow = 0; iRow < 9; iRow++)
+					{
+						for (auto iY = 0; iY < 3; iY++)
+						{
+							for (auto iX = 0; iX < 3; iX++)
+							{
+								if (iX != iCol)
+								{
+									short cellNew = Cell[iY + iGridRow * 3][iX + iGridCol * 3] & cellCol;
+									
+									if (cellNew != Cell[iY + iGridRow * 3][iX + iGridCol * 3])
+									{
+										Cell[iY + iGridRow * 3][iX + iGridCol * 3] = cellNew;
+										bUpdated = true;
+									}
+
+									if (cellNew == 0)
+									{
+										if (bFirst) 
+											cout << "Shouldn't happen on valid start";
+										return false;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Search for funky constraints to propagate
 
 		for (auto i = 0; i < 9; i++)
 		{
@@ -394,6 +588,7 @@ bool Board::bConstrain(void)
 							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 							{
 								// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+								if (bFirst) cout << "Shouldn't happen on valid start";
 								return(false);
 							}
 						}
@@ -419,6 +614,7 @@ bool Board::bConstrain(void)
 							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 							{
 								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
+								if (bFirst) cout << "Shouldn't happen on valid start";
 								return(false);
 							}
 						}
@@ -447,6 +643,7 @@ bool Board::bConstrain(void)
 							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 							{
 								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
+								if (bFirst) cout << "Shouldn't happen on valid start";
 								return(false);
 							}
 						}
@@ -483,6 +680,7 @@ bool Board::bConstrain(void)
 										if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 										{
 											// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+											if (bFirst) cout << "Shouldn't happen on valid start";
 											return(false);
 										}
 									}
@@ -517,6 +715,7 @@ bool Board::bConstrain(void)
 										if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 										{
 											// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+											if (bFirst) cout << "Shouldn't happen on valid start";
 											return(false);
 										}
 									}
@@ -560,6 +759,7 @@ bool Board::bConstrain(void)
 										if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 										{
 											// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+											if (bFirst) cout << "Shouldn't happen on valid start";
 											return(false);
 										}
 									}
@@ -607,6 +807,7 @@ bool Board::bConstrain(void)
 													if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 													{
 														// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+														if (bFirst) cout << "Shouldn't happen on valid start";
 														return(false);
 													}
 												}
@@ -654,6 +855,8 @@ bool Board::bConstrain(void)
 													if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 													{
 														// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+														if (bFirst) 
+															cout << "Shouldn't happen on valid start";
 														return(false);
 													}
 												}
@@ -718,6 +921,7 @@ bool Board::bConstrain(void)
 													if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 													{
 														// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+														if (bFirst) cout << "Shouldn't happen on valid start";
 														return(false);
 													}
 												}
@@ -729,81 +933,6 @@ bool Board::bConstrain(void)
 						}
 					}
 				}
-
-#if 0  // These 2 constraints are special cases of above rules
-
-				// If there are only 3 valid numbers in a grid row - then none of the other rows can have those 3
-
-				int uTriple = 0;
-
-				for (int k = 0; k < 3; k++)
-				{
-					int iOffRow = i;
-					int iOffCol = k + iGridCol * 3;
-
-					uTriple |= Cell[iOffRow][iOffCol];
-				}
-
-				if (TripleBit(uTriple))
-				{
-					for (int k = 0; k < 9; k++)
-					{
-						if (k / 3 != iGridCol)
-						{
-							unsigned short uNew = Cell[i][k] & ~uTriple;
-
-							if (uNew == Cell[i][k])
-								continue;
-
-							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
-							{
-								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
-								return(false);
-							}
-
-							bUpdated = true;
-							Cell[i][k] = uNew;
-						}
-					}
-				}
-
-				// If there are only 3 valid numbers in a grid column - then none of the other grid columns can have those 3
-
-				uTriple = 0;
-
-				for (int k = 0; k < 3; k++)
-				{
-					int iOffRow = k + iGridRow * 3;
-					int iOffCol = j;
-
-					uTriple |= Cell[iOffRow][iOffCol];
-				}
-
-				if (TripleBit(uTriple))
-				{
-					for (int k = 0; k < 9; k++)
-					{
-						if (k / 3 != iGridRow)
-						{
-							unsigned short uNew = Cell[k][j] & ~uTriple;
-
-							if (uNew == Cell[k][j])
-								continue;
-
-							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
-							{
-								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
-								return(false);
-							}
-
-							bUpdated = true;
-							Cell[k][j] = uNew;
-						}
-					}
-				}
-
-#endif
-
 			}
 		}
 	} while (bUpdated);
@@ -830,7 +959,7 @@ bool Board::bDone(void)
 
 bool Board::bSolveIt(bool bDisplay)
 {	
-	if (bConstrain())  // Propagate constraints - return false if there are conflicts
+	if (bConstrain(bDisplay))  // Propagate constraints - return false if there are conflicts
 	{
 		if (bDone())  // Check if that worked - easy Sudoku puzzles usually are solved 
 		{
