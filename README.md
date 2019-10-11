@@ -9,6 +9,7 @@ made to run on Linux.
 Enter a Sudoku board on the command line or read it in from a txt file like this:
 
 Sudoku.exe < easy0.txt
+
 Sudoku.exe < extreme7.txt
 
 The input format is 0 means unknown, otherwise 1-9 specifies what is in that
