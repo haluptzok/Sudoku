@@ -112,9 +112,9 @@ public:
 	}
 
 	void DisplayBoard(void);
-	bool bConstrain(bool bFirst);
+	bool bConstrain(int);
 	bool bDone(void);
-	bool bSolveIt(bool);
+	bool bSolveIt(int);
 };
 
 void Board::DisplayBoard()
@@ -213,8 +213,9 @@ inline int BitSet(unsigned short x)
 }
 
 // Apply constraints to other positions
-// bFirst means we haven't guessed yet, so no invalid board constraints should happen, like they will when we guess
-bool Board::bConstrain(bool bFirst)  
+// cRecurse is how many times we have called bConstrain from bConstrain
+// cRecurse == 0 means means we haven't guessed yet, so no invalid board constraints should happen, like they will when we guess.
+bool Board::bConstrain(int cRecurse)  
 {
 	bool bUpdated;
 
@@ -222,6 +223,104 @@ bool Board::bConstrain(bool bFirst)
 	{
 		bUpdated = false;
 
+#if 0  // It actually works fine just propagating singleton constraints only and guessing.  More guesses - but still instantanteously solved.
+
+		for (auto i = 0; i < 9; i++)
+		{
+			for (auto j = 0; j < 9; j++)
+			{
+				const int iGridRow = i / 3;
+				const int iGridCol = j / 3;
+
+				if (SingleBit(Cell[i][j]))   // Only 1 number is set - remove it from same column & row & grid
+				{
+					// remove singletons from each row
+
+					for (int k = 0; k < 9; k++)
+					{
+						if (k != i)  // Every cell other than the current cell can't have the same number
+						{
+							unsigned short uNew = Cell[k][j] & ~(Cell[i][j]);
+
+							if (uNew == Cell[k][j])
+							{
+								continue;  // nothing changed
+							}
+
+							Cell[k][j] = uNew;
+
+							bUpdated = true;  // something changed - try propagating another time after this one.
+
+							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
+							{
+								// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
+								if (cRecurse == 0) cout << "Shouldn't happen on valid start";
+								return(false);
+							}
+						}
+					}
+
+					// remove singletons from each column
+
+					for (int k = 0; k < 9; k++)
+					{
+						if (k != j)  // Every cell other than the current cell can't have the same number
+						{
+							unsigned short uNew = Cell[i][k] & ~(Cell[i][j]);
+
+							if (uNew == Cell[i][k])
+							{
+								continue;  // nothing changed
+							}
+
+							Cell[i][k] = uNew;
+
+							bUpdated = true;  // something changed - try propagating another time after this one.
+
+							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
+							{
+								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
+								if (cRecurse == 0) cout << "Shouldn't happen on valid start";
+								return(false);
+							}
+						}
+					}
+
+					// remove singletons from each grid
+
+					for (int k = 0; k < 9; k++)
+					{
+						int iOffRow = k / 3 + iGridRow * 3;
+						int iOffCol = k % 3 + iGridCol * 3;
+
+						if ((iOffRow != i) || (iOffCol != j)) // Every cell other than the current cell can't have the same number
+						{
+							unsigned short uNew = Cell[iOffRow][iOffCol] & ~(Cell[i][j]);
+
+							if (uNew == Cell[iOffRow][iOffCol])
+							{
+								continue;  // nothing changed
+							}
+
+							Cell[iOffRow][iOffCol] = uNew;
+
+							bUpdated = true;  // something changed - try propagating another time after this one.
+
+							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
+							{
+								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
+								if (cRecurse == 0) cout << "Shouldn't happen on valid start";
+								return(false);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (bUpdated)
+			continue;
+#else
 		// Look for a number that occurs only 1 time in a row, column, 3x3 grid.
 		// If the number has other numbers possible in that cell, make it just that number.
 		// 9 (rows/columns/grids) X 10 possible values (well the zero value doesn't really happen).
@@ -295,7 +394,7 @@ bool Board::bConstrain(bool bFirst)
 				assert(cCount < 11);
 				if (cCount <= 0)
 				{
-					if (bFirst) 
+					if (cRecurse == 0) 
 						cout << "Every number must appear possible in every row " << cCount << "\n";
 					return(false);
 				}
@@ -321,7 +420,7 @@ bool Board::bConstrain(bool bFirst)
 				assert(cCount < 11);
 				if (cCount <= 0)
 				{
-					if (bFirst)
+					if (cRecurse == 0)
 						cout << "Every number must appear possible in every col " << cCount << "\n";
 					return(false);
 				}
@@ -347,7 +446,7 @@ bool Board::bConstrain(bool bFirst)
 				assert(cCount < 11);
 				if (cCount <= 0)
 				{
-					if (bFirst) 
+					if (cRecurse == 0)
 						cout << "Every number must appear possible in every grd " << cCount << "\n";
 					return(false);
 				}
@@ -431,7 +530,7 @@ bool Board::bConstrain(bool bFirst)
 
 							if (cellNew == 0)
 							{
-								if (bFirst) 
+								if (cRecurse == 0)
 									cout << "Shouldn't happen on valid start";
 								return false;
 							}
@@ -458,7 +557,7 @@ bool Board::bConstrain(bool bFirst)
 
 									if (cellNew == 0)
 									{
-										if (bFirst) 
+										if (cRecurse == 0)
 											cout << "Shouldn't happen on valid start";
 										return false;
 									}
@@ -518,7 +617,7 @@ bool Board::bConstrain(bool bFirst)
 
 							if (cellNew == 0)
 							{
-								if (bFirst) 
+								if (cRecurse == 0)
 									cout << "Shouldn't happen on valid start";
 								return false;
 							}
@@ -545,7 +644,7 @@ bool Board::bConstrain(bool bFirst)
 
 									if (cellNew == 0)
 									{
-										if (bFirst) 
+										if (cRecurse == 0)
 											cout << "Shouldn't happen on valid start";
 										return false;
 									}
@@ -588,7 +687,7 @@ bool Board::bConstrain(bool bFirst)
 							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 							{
 								// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
-								if (bFirst) cout << "Shouldn't happen on valid start";
+								if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 								return(false);
 							}
 						}
@@ -614,7 +713,7 @@ bool Board::bConstrain(bool bFirst)
 							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 							{
 								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
-								if (bFirst) cout << "Shouldn't happen on valid start";
+								if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 								return(false);
 							}
 						}
@@ -643,15 +742,13 @@ bool Board::bConstrain(bool bFirst)
 							if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 							{
 								//cout << "Constraint at " << i << " " << j << "conflicts with " << i << " " << k << "\n";
-								if (bFirst) cout << "Shouldn't happen on valid start";
+								if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 								return(false);
 							}
 						}
 					}
 				}
-
 				// Look for 2 cells that match - with only 2 valid numbers.  No other cells can have those numbers
-
 				else if (DoubleBit(Cell[i][j]))
 				{
 					// if 2 cells with only 2 valid numbers match - remove from the rest of the row
@@ -680,7 +777,7 @@ bool Board::bConstrain(bool bFirst)
 										if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 										{
 											// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
-											if (bFirst) cout << "Shouldn't happen on valid start";
+											if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 											return(false);
 										}
 									}
@@ -715,7 +812,7 @@ bool Board::bConstrain(bool bFirst)
 										if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 										{
 											// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
-											if (bFirst) cout << "Shouldn't happen on valid start";
+											if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 											return(false);
 										}
 									}
@@ -759,7 +856,7 @@ bool Board::bConstrain(bool bFirst)
 										if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 										{
 											// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
-											if (bFirst) cout << "Shouldn't happen on valid start";
+											if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 											return(false);
 										}
 									}
@@ -807,7 +904,7 @@ bool Board::bConstrain(bool bFirst)
 													if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 													{
 														// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
-														if (bFirst) cout << "Shouldn't happen on valid start";
+														if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 														return(false);
 													}
 												}
@@ -855,7 +952,7 @@ bool Board::bConstrain(bool bFirst)
 													if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 													{
 														// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
-														if (bFirst) 
+														if (cRecurse == 0)
 															cout << "Shouldn't happen on valid start";
 														return(false);
 													}
@@ -921,7 +1018,7 @@ bool Board::bConstrain(bool bFirst)
 													if (uNew == 0)  // check for over constrained such that no valid solution allowed 
 													{
 														// cout << "Constraint at " << i << " " << j << "conflicts with " << k << " " << j << "\n";
-														if (bFirst) cout << "Shouldn't happen on valid start";
+														if (cRecurse == 0) cout << "Shouldn't happen on valid start";
 														return(false);
 													}
 												}
@@ -935,6 +1032,7 @@ bool Board::bConstrain(bool bFirst)
 				}
 			}
 		}
+#endif
 	} while (bUpdated);
 
 	return(true);
@@ -957,25 +1055,26 @@ bool Board::bDone(void)
 	return true;
 }
 
-bool Board::bSolveIt(bool bDisplay)
-{	
-	if (bConstrain(bDisplay))  // Propagate constraints - return false if there are conflicts
+// cRecurse tells how many levels deep in recursion we are
+bool Board::bSolveIt(int cRecurse)
+{		
+	if (bConstrain(cRecurse))  // Propagate constraints - return false if there are conflicts
 	{
 		if (bDone())  // Check if that worked - easy Sudoku puzzles usually are solved 
 		{
 			return(true);
 		}
 
-		if (bDisplay)
+		if (cRecurse == 0)  // Show board before we start guessing
 			DisplayBoard();
 
-		// Enumerate through possible constraints and see which ones work out
+		// Enumerate through guesses and see which ones work out
 
 		for (int i = 0; i < 9; i++)
 		{
 			for (int j = 0; j < 9; j++)
 			{
-				if (!SingleBit(Cell[i][j]))
+				if (!SingleBit(Cell[i][j]))  // If it's not already a single value
 				{
 					unsigned short iCurrent = Cell[i][j];
 					for (int k = 0; k < 9; k++)
@@ -988,6 +1087,7 @@ bool Board::bSolveIt(bool bDisplay)
 							gameNew = *this;
 							gameNew.Cell[i][j] = mask; // Add Constraint, we guessed it.
 							gcGuess += 1;
+
 							if (gcGuess % 1000000 == 0)
 							{
 								std::chrono::high_resolution_clock::time_point t_now = std::chrono::high_resolution_clock::now();
@@ -995,13 +1095,19 @@ bool Board::bSolveIt(bool bDisplay)
 								t_last = t_now;
 							}
 
-							if (gameNew.bSolveIt(false))  // If we succeed - we are done.   Don't return true to enumerate all solutions, pass bSolveIt true to print them all out
+							// Debugging stuff
+							// cout << "Guess recursion " << cRecurse << " X " << i << " Y " << j << " value " << k + 1 << " Guesses " << gcGuess << "\n";
+							// gameNew.DisplayBoard();
+
+							if (gameNew.bSolveIt(cRecurse + 1))  // If we succeed - we are done.   Don't return true to enumerate all solutions, pass bSolveIt true to print them all out
 							{
 								*this = gameNew; // return to print out.
 								return(true);
 							}
 						}
 					}
+
+					return false; // If you can't find a valid value for this spot, something previously guessed is wrong
 				}
 			}
 		}
@@ -1063,7 +1169,7 @@ int main(int argc, char* argv[])
 	game.DisplayBoard();
 
 	std::chrono::high_resolution_clock::time_point t_start = t_last = std::chrono::high_resolution_clock::now();
-	game.bSolveIt(true);
+	game.bSolveIt(0);
 	std::chrono::high_resolution_clock::time_point t_end = std::chrono::high_resolution_clock::now();
 
 	game.DisplayBoard();
