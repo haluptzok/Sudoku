@@ -209,7 +209,7 @@ inline int BitSet(unsigned short x)
     case P9:
         return 9;
     }
-    assert(true);  // What?
+    assert(0);  // What?
     return 0;
 }
 
